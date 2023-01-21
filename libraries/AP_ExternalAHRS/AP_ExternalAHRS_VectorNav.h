@@ -56,6 +56,7 @@ private:
 
     void process_packet1(const uint8_t *b);
     void process_packet2(const uint8_t *b);
+    void process_packet2_VN_200(const uint8_t *b);
     void process_packet_VN_100(const uint8_t *b);
     void wait_register_responce(const uint8_t register_num);
 
@@ -71,6 +72,7 @@ private:
 
     enum class TYPE {
         VN_300,
+        VN_200,
         VN_100,
     } type;
 

@@ -129,7 +129,45 @@ struct PACKED VN_packet2 {
 static_assert(sizeof(VN_packet2)+2+4*2+2 == VN_PKT2_LENGTH, "incorrect VN_packet2 length");
 
 /*
-  assumes the following VN-300 config:
+  header for pre-configured 5Hz data
+  assumes the following VN-200 config:
+    $VNWRG,76,3,80,1C,0002,0010,20B8*45
+
+    0x4E: Groups 2,3,4,7
+    Group 2 (Time):
+        0x0002:
+            TimeGps
+    Group 3 (IMU):
+        0x0010:
+            Temp
+    Group 4 (GPS1):
+        0x20B8:
+            NumSats
+            Fix
+            PosLLa
+            VelNed
+            DOP
+
+*/
+static const uint8_t vn_200_pkt2_header[] { 0x4e, 0x02, 0x00, 0x10, 0x00, 0xb8, 0x20};
+#define VN_200_PKT2_LENGTH //XX // includes header and CRC
+
+struct PACKED VN_200_packet2 {
+    uint64_t timeGPS;
+    float temp;
+    uint8_t numGPS1Sats;
+    uint8_t GPS1Fix;
+    double GPS1posLLA[3];
+    float GPS1velNED[3];
+    float GPS1DOP[7];
+};
+
+// check packet size for 3 groups
+static_assert(sizeof(VN_200_packet2)+2+3*2+2 == VN_200_PKT2_LENGTH, "incorrect VN_200_packet2 length");
+
+
+/*
+  assumes the following VN-100 config:
     $VNWRG,75,3,80,14,073E,0004*66
 
   Alternate first packet for VN-100
@@ -179,7 +217,7 @@ AP_ExternalAHRS_VectorNav::AP_ExternalAHRS_VectorNav(AP_ExternalAHRS *_frontend,
     baudrate = sm.find_baudrate(AP_SerialManager::SerialProtocol_AHRS, 0);
     port_num = sm.find_portnum(AP_SerialManager::SerialProtocol_AHRS, 0);
 
-    bufsize = MAX(MAX(VN_PKT1_LENGTH, VN_PKT2_LENGTH), VN_100_PKT1_LENGTH);
+    bufsize = MAX(MAX(VN_PKT1_LENGTH, VN_PKT2_LENGTH),MAX(VN_PKT1_LENGTH, VN_200_PKT2_LENGTH),VN_100_PKT1_LENGTH);
     pktbuf = new uint8_t[bufsize];
     last_pkt1 = new VN_packet1;
     last_pkt2 = new VN_packet2;
@@ -220,6 +258,7 @@ bool AP_ExternalAHRS_VectorNav::check_uart()
     bool match_header1 = false;
     bool match_header2 = false;
     bool match_header3 = false;
+    bool match_header4 = false;
 
     if (pktbuf[0] != SYNC_BYTE) {
         goto reset;
@@ -228,10 +267,15 @@ bool AP_ExternalAHRS_VectorNav::check_uart()
     if (type == TYPE::VN_300) {
         match_header1 = (0 == memcmp(&pktbuf[1], vn_pkt1_header, MIN(sizeof(vn_pkt1_header), unsigned(pktoffset-1))));
         match_header2 = (0 == memcmp(&pktbuf[1], vn_pkt2_header, MIN(sizeof(vn_pkt2_header), unsigned(pktoffset-1))));
-    } else {
+    } 
+    else if (type == TYPE:VN_200) {
+        match_header1 = (0 == memcmp(&pktbuf[1], vn_pkt1_header, MIN(sizeof(vn_pkt1_header), unsigned(pktoffset-1))));
+        match_header4 = (0 == memcmp(&pktbuf[1], vn_200_pkt2_header, MIN(sizeof(vn_200_pkt2_header), unsigned(pktoffset-1))));
+    }
+    else {
         match_header3 = (0 == memcmp(&pktbuf[1], vn_100_pkt1_header, MIN(sizeof(vn_100_pkt1_header), unsigned(pktoffset-1))));
     }
-    if (!match_header1 && !match_header2 && !match_header3) {
+    if (!match_header1 && !match_header2 && !match_header3 && !match_header4) {
         goto reset;
     }
 
@@ -245,13 +289,23 @@ bool AP_ExternalAHRS_VectorNav::check_uart()
         } else {
             goto reset;
         }
-    } else if (match_header2 && pktoffset >= VN_PKT2_LENGTH) {
+    } else if (match_header2 && pktoffset >= VN_PKT2_LENGTH ) {
         uint16_t crc = crc16_ccitt(&pktbuf[1], VN_PKT2_LENGTH-1, 0);
         if (crc == 0) {
             // got pkt2
             process_packet2(&pktbuf[sizeof(vn_pkt2_header)+1]);
             memmove(&pktbuf[0], &pktbuf[VN_PKT2_LENGTH], pktoffset-VN_PKT2_LENGTH);
             pktoffset -= VN_PKT2_LENGTH;
+        } else {
+            goto reset;
+        }
+     } else if (match_header4 && pktoffset >= VN_200_PKT2_LENGTH ) {
+        uint16_t crc = crc16_ccitt(&pktbuf[1], VN_200_PKT2_LENGTH-1, 0);
+        if (crc == 0) {
+            // got VN-200 pkt2
+            process_packet2(&pktbuf[sizeof(vn_200_pkt2_header)+1]);
+            memmove(&pktbuf[0], &pktbuf[VN_200_PKT2_LENGTH], pktoffset-VN_200_PKT2_LENGTH);
+            pktoffset -= VN_200_PKT2_LENGTH;
         } else {
             goto reset;
         }
@@ -415,8 +469,15 @@ void AP_ExternalAHRS_VectorNav::update_thread()
 
         // This assumes unit is still configured at its default rate of 800hz
         nmea_printf(uart, "$VNWRG,75,3,%u,14,073E,0004", unsigned(800/get_rate()));
-
-    } else {
+    }
+    else if(strncmp(model_name, "VN-200", 6) == 0)
+    {
+        // VN-200
+        type = TYPE::VN_200;
+        nmea_printf(uart, "$VNWRG,75,3,%u,34,072E,0106,0612", unsigned(400/get_rate()));
+        nmea_printf(uart, "$VNWRG,76,3,80,4E,0002,0010,20B8");
+    }
+    else {
         // Default to Setup for VN-300 series
         // This assumes unit is still configured at its default rate of 400hz
         nmea_printf(uart, "$VNWRG,75,3,%u,34,072E,0106,0612", unsigned(400/get_rate()));
@@ -541,6 +602,48 @@ void AP_ExternalAHRS_VectorNav::process_packet1(const uint8_t *b)
 void AP_ExternalAHRS_VectorNav::process_packet2(const uint8_t *b)
 {
     const struct VN_packet2 &pkt2 = *(struct VN_packet2 *)b;
+    const struct VN_packet1 &pkt1 = *last_pkt1;
+
+    last_pkt2_ms = AP_HAL::millis();
+    *last_pkt2 = pkt2;
+
+    AP_ExternalAHRS::gps_data_message_t gps;
+
+    // get ToW in milliseconds
+    gps.gps_week = pkt2.timeGPS / (AP_MSEC_PER_WEEK * 1000000ULL);
+    gps.ms_tow = (pkt2.timeGPS / 1000000ULL) % (60*60*24*7*1000ULL);
+    gps.fix_type = pkt2.GPS1Fix;
+    gps.satellites_in_view = pkt2.numGPS1Sats;
+
+    gps.horizontal_pos_accuracy = pkt1.posU;
+    gps.vertical_pos_accuracy = pkt1.posU;
+    gps.horizontal_vel_accuracy = pkt1.velU;
+
+    gps.hdop = pkt2.GPS1DOP[4];
+    gps.vdop = pkt2.GPS1DOP[3];
+
+    gps.latitude = pkt2.GPS1posLLA[0] * 1.0e7;
+    gps.longitude = pkt2.GPS1posLLA[1] * 1.0e7;
+    gps.msl_altitude = pkt2.GPS1posLLA[2] * 1.0e2;
+
+    gps.ned_vel_north = pkt2.GPS1velNED[0];
+    gps.ned_vel_east = pkt2.GPS1velNED[1];
+    gps.ned_vel_down = pkt2.GPS1velNED[2];
+
+    if (gps.fix_type >= 3 && !state.have_origin) {
+        WITH_SEMAPHORE(state.sem);
+        state.origin = Location{int32_t(pkt2.GPS1posLLA[0] * 1.0e7),
+                                int32_t(pkt2.GPS1posLLA[1] * 1.0e7),
+                                int32_t(pkt2.GPS1posLLA[2] * 1.0e2),
+                                Location::AltFrame::ABSOLUTE};
+        state.have_origin = true;
+    }
+
+    AP::gps().handle_external(gps);
+}
+void AP_ExternalAHRS_VectorNav::process_packet2_VN_200(const uint8_t *b)
+{
+    const struct VN_200_packet2 &pkt2 = *(struct VN_200_packet2 *)b;
     const struct VN_packet1 &pkt1 = *last_pkt1;
 
     last_pkt2_ms = AP_HAL::millis();
@@ -723,6 +826,12 @@ bool AP_ExternalAHRS_VectorNav::pre_arm_check(char *failure_msg, uint8_t failure
             return false;
         }
     }
+    if (type == TYPE::VN_200) {
+        if (last_pkt2->GPS1Fix < 3) {
+            hal.util->snprintf(failure_msg, failure_msg_len, "VectorNav no GPS1 lock");
+            return false;
+        }
+    }
     return true;
 }
 
@@ -733,7 +842,7 @@ bool AP_ExternalAHRS_VectorNav::pre_arm_check(char *failure_msg, uint8_t failure
 void AP_ExternalAHRS_VectorNav::get_filter_status(nav_filter_status &status) const
 {
     memset(&status, 0, sizeof(status));
-    if (type == TYPE::VN_300) {
+    if (type == TYPE::VN_300 || type == TYPE::VN_200) {
         if (last_pkt1 && last_pkt2) {
             status.flags.initalized = 1;
         }
