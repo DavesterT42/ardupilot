@@ -217,7 +217,7 @@ AP_ExternalAHRS_VectorNav::AP_ExternalAHRS_VectorNav(AP_ExternalAHRS *_frontend,
     baudrate = sm.find_baudrate(AP_SerialManager::SerialProtocol_AHRS, 0);
     port_num = sm.find_portnum(AP_SerialManager::SerialProtocol_AHRS, 0);
 
-    bufsize = MAX(MAX(VN_PKT1_LENGTH, VN_PKT2_LENGTH),MAX(VN_PKT1_LENGTH, VN_200_PKT2_LENGTH),VN_100_PKT1_LENGTH);
+    bufsize = MAX(MAX(VN_PKT1_LENGTH, VN_PKT2_LENGTH),MAX(VN_200_PKT2_LENGTH,VN_100_PKT1_LENGTH));
     pktbuf = new uint8_t[bufsize];
     last_pkt1 = new VN_packet1;
     last_pkt2 = new VN_packet2;
