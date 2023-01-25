@@ -133,7 +133,7 @@ static_assert(sizeof(VN_packet2)+2+4*2+2 == VN_PKT2_LENGTH, "incorrect VN_packet
   assumes the following VN-200 config:
     $VNWRG,76,3,80,1C,0002,0010,20B8*45
 
-    0x4E: Groups 2,3,4,7
+    0x4E: Groups 2,3,4
     Group 2 (Time):
         0x0002:
             TimeGps
@@ -268,7 +268,7 @@ bool AP_ExternalAHRS_VectorNav::check_uart()
         match_header1 = (0 == memcmp(&pktbuf[1], vn_pkt1_header, MIN(sizeof(vn_pkt1_header), unsigned(pktoffset-1))));
         match_header2 = (0 == memcmp(&pktbuf[1], vn_pkt2_header, MIN(sizeof(vn_pkt2_header), unsigned(pktoffset-1))));
     } 
-    else if (type == TYPE:VN_200) {
+    else if (type == TYPE::VN_200) {
         match_header1 = (0 == memcmp(&pktbuf[1], vn_pkt1_header, MIN(sizeof(vn_pkt1_header), unsigned(pktoffset-1))));
         match_header4 = (0 == memcmp(&pktbuf[1], vn_200_pkt2_header, MIN(sizeof(vn_200_pkt2_header), unsigned(pktoffset-1))));
     }
