@@ -303,7 +303,7 @@ bool AP_ExternalAHRS_VectorNav::check_uart()
         uint16_t crc = crc16_ccitt(&pktbuf[1], VN_200_PKT2_LENGTH-1, 0);
         if (crc == 0) {
             // got VN-200 pkt2
-            process_packet2(&pktbuf[sizeof(vn_200_pkt2_header)+1]);
+            process_packet2_VN_200(&pktbuf[sizeof(vn_200_pkt2_header)+1]);
             memmove(&pktbuf[0], &pktbuf[VN_200_PKT2_LENGTH], pktoffset-VN_200_PKT2_LENGTH);
             pktoffset -= VN_200_PKT2_LENGTH;
         } else {
