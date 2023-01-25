@@ -114,15 +114,15 @@ static const uint8_t vn_pkt2_header[] { 0x4e, 0x02, 0x00, 0x10, 0x00, 0xb8, 0x20
 #define VN_PKT2_LENGTH 92 // includes header and CRC
 
 struct PACKED VN_packet2 {
-    uint64_t timeGPS;
+    uint64_t timeGPS; 
     float temp;
-    uint8_t numGPS1Sats;
-    uint8_t GPS1Fix;
-    double GPS1posLLA[3];
-    float GPS1velNED[3];
-    float GPS1DOP[7];
-    uint8_t numGPS2Sats;
-    uint8_t GPS2Fix;
+    uint8_t numGPS1Sats; 
+    uint8_t GPS1Fix; 
+    double GPS1posLLA[3]; 
+    float GPS1velNED[3]; 
+    float GPS1DOP[7]; 
+    uint8_t numGPS2Sats; 
+    uint8_t GPS2Fix; 
 };
 
 // check packet size for 4 groups
@@ -150,16 +150,16 @@ static_assert(sizeof(VN_packet2)+2+4*2+2 == VN_PKT2_LENGTH, "incorrect VN_packet
 
 */
 static const uint8_t vn_200_pkt2_header[] { 0x4e, 0x02, 0x00, 0x10, 0x00, 0xb8, 0x20};
-#define VN_200_PKT2_LENGTH 85//XX // includes header and CRC
+#define VN_200_PKT2_LENGTH 88 // includes header and CRC
 
 struct PACKED VN_200_packet2 {
-    uint64_t timeGPS;
-    float temp;
-    uint8_t numGPS1Sats;
-    uint8_t GPS1Fix;
-    double GPS1posLLA[3];
-    float GPS1velNED[3];
-    float GPS1DOP[7];
+    uint64_t timeGPS; //8
+    float temp; //4
+    uint8_t numGPS1Sats; //1
+    uint8_t GPS1Fix; //1
+    double GPS1posLLA[3]; //24
+    float GPS1velNED[3]; //12
+    float GPS1DOP[7]; //28
 };
 
 // check packet size for 3 groups
