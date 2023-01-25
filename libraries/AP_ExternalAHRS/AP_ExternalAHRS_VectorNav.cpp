@@ -150,7 +150,7 @@ static_assert(sizeof(VN_packet2)+2+4*2+2 == VN_PKT2_LENGTH, "incorrect VN_packet
 
 */
 static const uint8_t vn_200_pkt2_header[] { 0x4e, 0x02, 0x00, 0x10, 0x00, 0xb8, 0x20};
-#define VN_200_PKT2_LENGTH //XX // includes header and CRC
+#define VN_200_PKT2_LENGTH 85 // includes header and CRC
 
 struct PACKED VN_200_packet2 {
     uint64_t timeGPS;
